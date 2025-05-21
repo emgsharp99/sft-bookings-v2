@@ -1,0 +1,5 @@
+/Data
+/.venv
+/.idea
+config.py
+bookings.log
