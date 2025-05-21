@@ -3,7 +3,6 @@ import copy
 import hashlib
 import json
 import logging
-import pprint
 import sys
 import traceback
 from datetime import datetime
@@ -59,17 +58,14 @@ MASTER_COLUMNS_MAPPING = {
 
 class Booking:
     def __init__(self):
-        self.booking_time: Optional[str] = None
         self.leader_details: Optional[dict] = None
         self.guests: Optional[dict] = None
-        self.start_date: Optional[str] = None
-        self.end_date: Optional[str] = None
         self.how_heard: Optional[str] = None
         self.dietaries: Optional[str] = None
         self.kids_meals: Optional[str] = None
 
-    def pretty_print(self) -> None:
-        pprint.pprint(self.__dict__)
+    def log(self, logger) -> None:
+        logger.info(self.__dict__)
 
     def dump_to_json(self, path: Path) -> None:
         bookings = {}
@@ -206,7 +202,7 @@ def parse_row(row: pd.Series) -> Booking:
     return booking
 
 
-def process_responses(client, logger=None):
+def process_responses(client, logger=None, parser_args=None):
     try:
         sheet = client.open_by_key(config.CHALET_RESPONSE_SHEET).get_worksheet(0)
         responses = pd.DataFrame(sheet.get_all_values())
@@ -231,7 +227,10 @@ def process_responses(client, logger=None):
         cleaned_row = row.replace(r'^\s*$', pd.NA, regex=True).dropna()
         booking = parse_row(cleaned_row)
         booking.dump_to_json(BOOKINGS_DIRECTORY)
-        booking.add_to_master(client)
+        if parser_args.log_only:
+            booking.log(logger)
+        else:
+            booking.add_to_master(client)
 
 
 def main(started=datetime.now()):
@@ -240,6 +239,7 @@ def main(started=datetime.now()):
 
     parser = argparse.ArgumentParser(description="Chalet Booking Processor")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
+    parser.add_argument("-l", "--log_only", action="store_true", help="Print bookings to console and don't upload to sheet")
     args = parser.parse_args()
 
     if args.debug:
@@ -247,8 +247,10 @@ def main(started=datetime.now()):
         for path in [HASH_DIRECTORY, BOOKINGS_DIRECTORY]:
             if path.exists():
                 path.unlink()
+    if args.log_only:
+        logger.info("*** LOG-ONLY MODE ENABLED ***")
 
-    process_responses(client=gspread.service_account(), logger=logger)
+    process_responses(client=gspread.service_account(), logger=logger, parser_args=args)
 
     with open(HASH_DIRECTORY, 'w') as f:
         json.dump({"datetime": str(started), "hash": current_hash}, f, indent=2)
