@@ -5,6 +5,9 @@ from datetime import datetime
 from functools import wraps
 from email.message import EmailMessage
 
+import config
+
+
 def parse_phone_number(number: str) -> str:
     """
     Normalizes a UK phone number to local format starting with '0'.
@@ -69,11 +72,11 @@ def send_booking_alert(sender_email, sender_password, recipient_emails, message_
     msg.add_alternative(message_body, subtype='html')
 
     if log_only:
-        logger.info("*** Email not sent in log-only mode ***")
+        logger.info("Email not sent in log-only mode")
         logger.info(message_body)
         return
     elif debug:
-        logger.info(f"*** Email only sent to {recipient_emails[0]} in debug mode ***")
+        logger.info(f"Email only sent to {recipient_emails[0]} in debug mode")
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(sender_email, sender_password)
@@ -92,10 +95,16 @@ def retry(max_retries=3, delay=2, logger=None):
     Parameters:
     - max_retries (int): Maximum number of retry attempts. Default is 3.
     - delay (int or float): Delay (in seconds) between retry attempts. Default is 2.
+    - logger (Logger): Optional logger for logging retry attempts.
+    - alert_email (dict): Dictionary with email info:
+        {
+            "to": ["recipient@example.com"],
+            "subject": "Function Failure Alert"
+        }
 
     Returns:
     - The result of the decorated function if successful.
-    - Raises the last exception if all retries fail.
+    - Sends an email and raises the last exception if all retries fail.
     """
     def decorator(func):
         @wraps(func)
@@ -104,11 +113,18 @@ def retry(max_retries=3, delay=2, logger=None):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    logger.info(f"Attempt {attempt + 1} failed: {e}")
+                    if logger:
+                        logger.warning(f"Attempt {attempt + 1} failed: {e}")
                     if attempt < max_retries - 1:
                         time.sleep(delay)
                     else:
+                        message = f"Failed to update bookings after {max_retries} attempts.\n\nError: {e}"
+                        send_booking_alert(
+                            sender_email=config.GMAIL_ACCOUNT,
+                            sender_password=config.GMAIL_PASSWORD,
+                            recipient_emails=config.LIVE_EMAILS,
+                            message_body=message,
+                            logger=logger)
                         raise
         return wrapper
     return decorator
-

@@ -84,8 +84,6 @@ class Booking:
         Adds the booking and guest data to the master Google Sheet.
         """
         sheet_id = config.CHALET_MASTER_SHEET if not debug else config.TEST_MASTER_SHEET
-        if debug:
-            logger.info("*** Using test sheet in debug mode ***")
         sheet = client.open_by_key(sheet_id).get_worksheet(0)
         master = pd.DataFrame(sheet.get_all_values())
         master.columns = master.iloc[0]
@@ -121,7 +119,7 @@ class Booking:
             map_fields(guest, row, cells)
 
         sheet.update_cells(cells, value_input_option='USER_ENTERED')
-        logger.info("*** Cells updated successfully***")
+        logger.info(f"Cells updated successfully for {leader["family_name"]}")
 
 
 def check_sheet_changed(df: pd.DataFrame, logger=None) -> bool:
@@ -236,6 +234,8 @@ def process_responses(client, logger=None, parser_args=None):
         if parser_args.log_only:
             booking.log(logger)
         else:
+            if parser_args.debug:
+                logger.info("Using test sheet in debug mode")
             booking.add_to_master(client, debug=parser_args.debug, logger=LOGGER)
     return len(new_responses)
 
