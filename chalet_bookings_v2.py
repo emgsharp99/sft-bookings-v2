@@ -240,7 +240,7 @@ def process_responses(client, logger=None, parser_args=None):
     return len(new_responses)
 
 
-@retry(max_retries=3, delay=60, logger=LOGGER)
+@retry(max_retries=3, delay=1, logger=LOGGER)
 def main():
     started = datetime.now()
     logging.basicConfig(level=logging.INFO)

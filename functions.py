@@ -124,7 +124,8 @@ def retry(max_retries=3, delay=2, logger=None):
                             sender_password=config.GMAIL_PASSWORD,
                             recipient_emails=config.LIVE_EMAILS,
                             message_body=message,
-                            logger=logger)
+                            logger=logger,
+                            debug=True)
                         raise
         return wrapper
     return decorator
