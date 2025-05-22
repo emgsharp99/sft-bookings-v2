@@ -13,13 +13,14 @@ import gspread
 import numpy as np
 import pandas as pd
 
-from functions import parse_phone_number, parse_long_form_date
+from functions import parse_phone_number, parse_long_form_date, retry, send_booking_alert
 import config
 
 # Constants
 HASH_DIRECTORY = Path(__file__).parent / 'Data' / 'hash.json'
 BOOKINGS_DIRECTORY = Path(__file__).parent / 'Data' / 'bookings.json'
 LOG_FILE_PATH = Path(__file__).parent / "bookings.log"
+LOGGER = logging.getLogger(__name__)
 
 # Settings
 pd.set_option('future.no_silent_downcasting', True)
@@ -202,6 +203,7 @@ def parse_row(row: pd.Series) -> Booking:
     return booking
 
 
+@retry(max_retries=3, delay=60, logger=LOGGER)
 def process_responses(client, logger=None, parser_args=None):
     try:
         sheet = client.open_by_key(config.CHALET_RESPONSE_SHEET).get_worksheet(0)
@@ -231,10 +233,11 @@ def process_responses(client, logger=None, parser_args=None):
             booking.log(logger)
         else:
             booking.add_to_master(client)
+    return len(new_responses)
 
 
-def main(started=datetime.now()):
-    logger = logging.getLogger("bookings")
+def main():
+    started = datetime.now()
     logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser(description="Chalet Booking Processor")
@@ -243,18 +246,28 @@ def main(started=datetime.now()):
     args = parser.parse_args()
 
     if args.debug:
-        logger.info("*** DEBUG MODE ENABLED ***")
+        LOGGER.info("*** DEBUG MODE ENABLED ***")
         for path in [HASH_DIRECTORY, BOOKINGS_DIRECTORY]:
             if path.exists():
                 path.unlink()
     if args.log_only:
-        logger.info("*** LOG-ONLY MODE ENABLED ***")
+        LOGGER.info("*** LOG-ONLY MODE ENABLED ***")
 
-    process_responses(client=gspread.service_account(), logger=logger, parser_args=args)
+    new_responses = process_responses(client=gspread.service_account(), logger=LOGGER, parser_args=args)
 
     with open(HASH_DIRECTORY, 'w') as f:
         json.dump({"datetime": str(started), "hash": current_hash}, f, indent=2)
 
+    html_email_content = f"""
+    <html>
+        <body>
+            <p><strong>2025/2026 BOOKINGS:</strong></p>
+            <p>There were {new_responses} new chalet bookings, the master sheet has been updated.</p>
+            <p><em>This alert was generated at {datetime.now()}.</em></p>
+        </body>
+    </html>
+    """
+    send_booking_alert(config.GMAIL_ACCOUNT, config.GMAIL_PASSWORD, config.LIVE_EMAILS, html_email_content, LOGGER, args.debug, args.log_only)
 
 if __name__ == "__main__":
     main()

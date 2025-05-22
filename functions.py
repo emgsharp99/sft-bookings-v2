@@ -1,5 +1,9 @@
 import re
+import time
+import smtplib
 from datetime import datetime
+from functools import wraps
+from email.message import EmailMessage
 
 def parse_phone_number(number: str) -> str:
     """
@@ -43,4 +47,68 @@ def parse_long_form_date(date_str: str) -> str:
 
     # Format to dd/mm/yyyy
     return dt.strftime("%d/%m/%Y")
+
+def send_booking_alert(sender_email, sender_password, recipient_emails, message_body, logger=None, debug=False, log_only=False):
+    """
+    Sends an HTML-formatted email with the subject "Booking alert" to multiple recipients.
+
+    Parameters:
+    - sender_email (str): The sender's email address.
+    - sender_password (str): The password or app-specific password for the sender's email.
+    - recipient_emails (list of str): A list of recipient email addresses.
+
+    Returns:
+    None. Prints success or failure message to the console.
+    """
+    msg = EmailMessage()
+    msg['Subject'] = 'Booking alert'
+    msg['From'] = sender_email
+    msg['To'] = ', '.join(recipient_emails) if not debug else recipient_emails[0]
+
+    msg.set_content("This email requires an HTML-compatible email client.")
+    msg.add_alternative(message_body, subtype='html')
+
+    if log_only:
+        logger.info("*** Email not sent in log-only mode ***")
+        logger.info(message_body)
+        return
+    elif debug:
+        logger.info(f"*** Email only sent to {recipient_emails[0]} in debug mode ***")
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(sender_email, sender_password)
+            smtp.send_message(msg)
+        logger.info("Email sent successfully.")
+        logger.info(message_body)
+    except Exception as e:
+        logger.critical(f"Failed to send email: {e}")
+    return
+
+
+def retry(max_retries=3, delay=2, logger=None):
+    """
+    A decorator that retries a function call if an exception occurs.
+
+    Parameters:
+    - max_retries (int): Maximum number of retry attempts. Default is 3.
+    - delay (int or float): Delay (in seconds) between retry attempts. Default is 2.
+
+    Returns:
+    - The result of the decorated function if successful.
+    - Raises the last exception if all retries fail.
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    logger.info(f"Attempt {attempt + 1} failed: {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(delay)
+                    else:
+                        raise
+        return wrapper
+    return decorator
 
