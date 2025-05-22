@@ -119,7 +119,8 @@ class Booking:
             map_fields(guest, row, cells)
 
         sheet.update_cells(cells, value_input_option='USER_ENTERED')
-        logger.info(f"Cells updated successfully for {leader["family_name"]}")
+        booking_ref = leader["family_name"]
+        logger.info(f"Cells updated successfully for {booking_ref}")
 
 
 def check_sheet_changed(df: pd.DataFrame, logger=None) -> bool:
@@ -240,7 +241,7 @@ def process_responses(client, logger=None, parser_args=None):
     return len(new_responses)
 
 
-@retry(max_retries=3, delay=1, logger=LOGGER)
+@retry(max_retries=3, delay=60, logger=LOGGER)
 def main():
     started = datetime.now()
     logging.basicConfig(level=logging.INFO)
