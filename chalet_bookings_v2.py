@@ -11,9 +11,9 @@ from typing import Optional
 
 import gspread
 import numpy as np
-import os
 import pandas as pd
 
+import config
 from functions import parse_phone_number, parse_long_form_date, retry, send_booking_alert
 
 
@@ -83,7 +83,7 @@ class Booking:
         """
         Adds the booking and guest data to the master Google Sheet.
         """
-        sheet = client.open_by_key(os.environ.get(TEST_MASTER_SHEET)).get_worksheet(0)
+        sheet = client.open_by_key(config.TEST_MASTER_SHEET).get_worksheet(0)
         master = pd.DataFrame(sheet.get_all_values())
         master.columns = master.iloc[0]
         master = master[1:]
@@ -207,7 +207,7 @@ def parse_row(row: pd.Series) -> Booking:
 @retry(max_retries=3, delay=60, logger=LOGGER)
 def process_responses(client, logger=None, parser_args=None):
     try:
-        sheet = client.open_by_key(os.environ.get(CHALET_RESPONSE_SHEET)).get_worksheet(0)
+        sheet = client.open_by_key(config.CHALET_RESPONSE_SHEET).get_worksheet(0)
         responses = pd.DataFrame(sheet.get_all_values())
     except Exception:
         logger.critical("Failed to fetch sheet:\n" + traceback.format_exc())
@@ -268,7 +268,7 @@ def main():
         </body>
     </html>
     """
-    send_booking_alert(os.environ.get(GMAIL_ACCOUNT), os.environ.get(GMAIL_PASSWORD), os.environ.get(LIVE_EMAILS), html_email_content, LOGGER, args.debug, args.log_only)
+    send_booking_alert(config.GMAIL_ACCOUNT, config.GMAIL_PASSWORD, config.LIVE_EMAILS, html_email_content, LOGGER, args.debug, args.log_only)
 
 if __name__ == "__main__":
     main()
