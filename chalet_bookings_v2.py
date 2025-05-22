@@ -79,11 +79,14 @@ class Booking:
         with open(path, "w") as f:
             json.dump(bookings, f, indent=2)
 
-    def add_to_master(self, client) -> None:
+    def add_to_master(self, client, debug=False, logger=None) -> None:
         """
         Adds the booking and guest data to the master Google Sheet.
         """
-        sheet = client.open_by_key(config.TEST_MASTER_SHEET).get_worksheet(0)
+        sheet_id = config.CHALET_MASTER_SHEET if not debug else config.TEST_MASTER_SHEET
+        if debug:
+            logger.info("*** Using test sheet in debug mode ***")
+        sheet = client.open_by_key(sheet_id).get_worksheet(0)
         master = pd.DataFrame(sheet.get_all_values())
         master.columns = master.iloc[0]
         master = master[1:]
@@ -118,6 +121,7 @@ class Booking:
             map_fields(guest, row, cells)
 
         sheet.update_cells(cells, value_input_option='USER_ENTERED')
+        logger.info("*** Cells updated successfully***")
 
 
 def check_sheet_changed(df: pd.DataFrame, logger=None) -> bool:
@@ -204,7 +208,6 @@ def parse_row(row: pd.Series) -> Booking:
     return booking
 
 
-@retry(max_retries=3, delay=60, logger=LOGGER)
 def process_responses(client, logger=None, parser_args=None):
     try:
         sheet = client.open_by_key(config.CHALET_RESPONSE_SHEET).get_worksheet(0)
@@ -233,10 +236,11 @@ def process_responses(client, logger=None, parser_args=None):
         if parser_args.log_only:
             booking.log(logger)
         else:
-            booking.add_to_master(client)
+            booking.add_to_master(client, debug=parser_args.debug, logger=LOGGER)
     return len(new_responses)
 
 
+@retry(max_retries=3, delay=60, logger=LOGGER)
 def main():
     started = datetime.now()
     logging.basicConfig(level=logging.INFO)
