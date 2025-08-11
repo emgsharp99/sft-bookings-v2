@@ -123,13 +123,12 @@ class Booking:
         logger.info(f"Cells updated successfully for {booking_ref}")
 
 
-def check_sheet_changed(df: pd.DataFrame, logger=None) -> bool:
+def response_sheet_changed(df: pd.DataFrame, logger=None) -> bool:
     """
     Compares the hash of the current sheet to the stored hash to detect updates.
     """
     df_bytes = pd.util.hash_pandas_object(df, index=True).values.tobytes()
     current_hash = hashlib.sha256(df_bytes).hexdigest()
-
     previous_hash = None
     previous_datetime = datetime(1970, 1, 1)
 
@@ -138,6 +137,9 @@ def check_sheet_changed(df: pd.DataFrame, logger=None) -> bool:
             data = json.load(f)
             previous_hash = data.get("hash")
             previous_datetime = pd.to_datetime(data.get("datetime"))
+
+    LOGGER.info(f"The previous hash is: {previous_hash}.")
+    LOGGER.info(f"The new hash is: {current_hash}.")
 
     if previous_hash == current_hash:
         if logger:
@@ -219,7 +221,7 @@ def process_responses(client, logger=None, parser_args=None):
         logger.info("No responses yet.")
         sys.exit(1)
 
-    if not check_sheet_changed(responses, logger):
+    if not response_sheet_changed(responses, logger):
         sys.exit(1)
 
     responses.columns = responses.iloc[0]
