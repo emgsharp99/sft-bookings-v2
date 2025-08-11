@@ -51,7 +51,7 @@ def parse_long_form_date(date_str: str) -> str:
     # Format to dd/mm/yyyy
     return dt.strftime("%d/%m/%Y")
 
-def send_booking_alert(sender_email, sender_password, recipient_emails, message_body, logger=None, debug=False, log_only=False):
+def send_booking_alert(sender_email, sender_password, recipient_emails, message_body, logger=None):
     """
     Sends an HTML-formatted email with the subject "Booking alert" to multiple recipients.
 
@@ -66,17 +66,11 @@ def send_booking_alert(sender_email, sender_password, recipient_emails, message_
     msg = EmailMessage()
     msg['Subject'] = 'Booking alert'
     msg['From'] = sender_email
-    msg['To'] = ', '.join(recipient_emails) if not debug else recipient_emails[0]
+    msg['To'] = ', '.join(recipient_emails)
 
     msg.set_content("This email requires an HTML-compatible email client.")
     msg.add_alternative(message_body, subtype='html')
 
-    if log_only:
-        logger.info("Email not sent in log-only mode")
-        logger.info(message_body)
-        return
-    elif debug:
-        logger.info(f"Email only sent to {recipient_emails[0]} in debug mode")
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
             smtp.login(sender_email, sender_password)
