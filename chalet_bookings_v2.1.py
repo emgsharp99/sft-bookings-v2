@@ -108,24 +108,37 @@ class Booking:
 
 @app.route('/googleform', methods=['POST'])
 def google_form_webhook():
-    data = request.get_json()
-    filtered_data = filter_data(data)
-    LOGGER.info("Webhook triggered: response form submitted.")
-    LOGGER.info(f"Non-null results:\n {filtered_data}")
+    try:
+        data = request.get_json()
+        filtered_data = filter_data(data)
+        LOGGER.info("Webhook triggered: response form submitted.")
+        LOGGER.info(f"Non-null results:\n {filtered_data}")
 
-    booking = parse_booking(filtered_data)
-    booking.add_to_master(client = gspread.service_account(), logger=LOGGER)
+        booking = parse_booking(filtered_data)
+        booking.add_to_master(client = gspread.service_account(), logger=LOGGER)
 
-    html_email_content = f"""
-        <html>
-            <body>
-                <p><strong>2025/2026 BOOKINGS:</strong></p>
-                <p>There was a new chalet booking, the master sheet has been updated.</p>
-                <p><em>This alert was generated at {datetime.now()}.</em></p>
-            </body>
-        </html>
-        """
-    send_booking_alert(config.GMAIL_ACCOUNT, config.GMAIL_PASSWORD, config.LIVE_EMAILS, html_email_content, LOGGER)
+        html_email_content = f"""
+            <html>
+                <body>
+                    <p><strong>2025/2026 BOOKINGS:</strong></p>
+                    <p>There was a new chalet booking, the master sheet has been updated.</p>
+                    <p><em>This alert was generated at {datetime.now()}.</em></p>
+                </body>
+            </html>
+            """
+        send_booking_alert(config.GMAIL_ACCOUNT, config.GMAIL_PASSWORD, config.LIVE_EMAILS, html_email_content, LOGGER)
+    except Exception as e:
+        LOGGER.info(f"An exception occurred:\n{e}")
+        exception_email = f"""
+            <html>
+                <body>
+                    <p><strong>BOOKING ERROR:</strong></p>
+                    <p>There was an error with the booking system at {datetime.now()}:</p>
+                    <p>{e}</p>
+                </body>
+            </html>
+            """
+        send_booking_alert(config.GMAIL_ACCOUNT, config.GMAIL_PASSWORD, config.LIVE_EMAILS, exception_email, LOGGER)
     return "OK", 200
 
 def filter_data(data: dict) -> dict:
